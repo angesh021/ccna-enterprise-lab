@@ -8,7 +8,6 @@ Next Generation Firewall.  The lab topology, shown below, mixes layer‑2 and
 layer‑3 switching, enterprise Wi‑Fi and firewalling to simulate the kind of
 networks encountered in real world deployments.
 
- :agentCitation{citationIndex='0' label='Lab topology'}
 
 
 ## Contents
@@ -171,4 +170,29 @@ interface Vlan13
  ip address 10.0.13.1 255.255.255.0
 !
 ip route 1.1.1.1 255.255.255.255 10.0.255.2
+
+
+
+
+### Catalyst 2960 access switch
+
+! Trunk towards distribution switch
+interface GigabitEthernet0/1
+ description To 3560 (Port‑channel)
+ switchport mode trunk
+ channel‑group 1 mode active
+
+! Access port for PC and phone
+interface FastEthernet0/10
+ switchport mode access
+ switchport access vlan 10
+ switchport voice vlan 11    ! Voice VLAN is advertised via CDPv2:contentReference[oaicite:27]{index=27}
+ mls qos trust device cisco‑phone
+ spanning‑tree portfast
+!
+interface FastEthernet0/11
+ description Access point
+ switchport access vlan 12
+ power inline auto
+ spanning‑tree portfast
 
