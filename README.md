@@ -1,2 +1,174 @@
-# ccna-enterprise-lab
-A hands‑on Packet Tracer lab that simulates a small enterprise network with VLANs, inter‑VLAN routing, IPv6, wireless access, voice, and firewall/NAT—designed for CCNA‑level practice and experimentation.
+# CCNA Enterprise Lab – End‑to‑end network design in Packet Tracer
+
+This repository contains a Packet Tracer project used to practise CCNA‑level
+network design.  The project demonstrates how to build a small enterprise
+network that supports data, voice and wireless clients, implements IPv6
+addressing, provides inter‑VLAN routing and applies security policies with a
+Next Generation Firewall.  The lab topology, shown below, mixes layer‑2 and
+layer‑3 switching, enterprise Wi‑Fi and firewalling to simulate the kind of
+networks encountered in real world deployments.
+
+ :agentCitation{citationIndex='0' label='Lab topology'}
+
+
+## Contents
+
+* **`CCNA_LAB.pkt`** – the Packet Tracer file containing the complete lab.
+* **`screenshot.png`** – topology diagram used in this
+  README.
+* **`README.md`** – this document, describing the design, configuration and
+  verification steps.
+
+## Why this lab?
+
+This project brings together multiple CCNA topics in a coherent network
+design.  It is intended as a hands‑on exercise for anyone interested in
+building and troubleshooting enterprise‑style networks.  The lab demonstrates
+practical skills in areas such as VLAN deployment, inter‑VLAN routing,
+firewall and NAT configuration, wireless LAN deployment and the integration
+of IPv4 and IPv6.  Enterprise‑class devices are used throughout—Catalyst 3560
+and 2960 switches, ISR 4321 routers, a 5506‑X ASA firewall and a 2504
+wireless LAN controller—to mirror the types of equipment commonly found in
+production environments.  Design decisions such as separating voice and data
+VLANs or using Dynamic PAT for Internet access reflect best practices in
+many real networks.
+
+## Topology overview
+
+The network is split into a **Trusted** internal network and an **Internet**
+segment.  A Catalyst 3560 multilayer switch acts as the distribution
+switch and performs inter‑VLAN routing.  Two Catalyst 2960 access switches
+connect end hosts via an EtherChannel trunk.  A Cisco ASA 5506‑X firewall
+protects the internal network and performs Network Address Translation (NAT)
+before forwarding traffic towards a Cisco ISR 4321 edge router.  Wireless
+connectivity is provided by a Cisco 2504 wireless LAN controller (WLC) and two
+Lightweight Access Points (LAPs).  Voice services are implemented via
+Cisco 7960 IP phones that share the same access ports as PCs using the voice
+VLAN feature.
+
+### Addressing and VLANs
+
+The following table summarises the VLANs, their purpose and addressing in the
+lab.  IPv6 is used on the data VLAN to illustrate dual‑stack operation.
+
+| VLAN | Purpose          | Subnet(s)                         | Example hosts |
+|----:|------------------|-----------------------------------|---------------|
+| 10  | Data (wired/wireless) | `10.0.10.0/24` (IPv4) and `2001:10::/64` (IPv6) | PCs (10.0.10.21–22) and smartphones |
+| 11  | Voice            | `10.0.11.0/24`                    | IP phones |
+| 12  | Wireless APs     | `10.0.12.0/24`                    | Lightweight APs and WLC |
+| 13  | Server segment   | `10.0.13.0/24`                    | Internal server (10.0.13.5) |
+| —   | Core links       | `10.0.255.0/30` (switch↔router), `10.0.255.4/30` (switch↔ASA) | 3560 switch (.1/.5), ISR 4321 (.2), ASA (.6) |
+| —   | Internet links   | `50.1.2.0/30` (ASA↔edge router), `8.0.0.0/30` (edge router↔ISP server) | ASA (.1), edge router (.2), ISP server (.2) |
+
+### Device roles
+
+| Device | Function |
+|---|---|
+| **Catalyst 3560‑24PS** | Multilayer PoE switch; provides inter‑VLAN routing via SVIs and delivers power to IP phones and wireless access points.  It supports advanced QoS, access control lists and high‑performance IP routing while maintaining the simplicity of LAN switching:contentReference[oaicite:0]{index=0}.  The 24 Fast Ethernet ports with SFP uplinks and PoE allow the deployment of IP telephony and wireless access without additional power supplies:contentReference[oaicite:1]{index=1}. |
+| **Catalyst 2960‑24TT (two units)** | Access switches that provide edge‑port connectivity to PCs, phones and APs.  They are connected to the 3560 via an EtherChannel trunk for increased bandwidth and redundancy. |
+| **Cisco ISR 4321 routers (two units)** | Router 0 connects the internal network to the ASA through a /30 link.  Router 1 acts as the edge router towards the Internet.  The ISR 4321 is a versatile router that provides high‑speed connectivity and built‑in security features; it can handle large amounts of traffic without performance loss and includes intrusion prevention, firewall and VPN capabilities:contentReference[oaicite:2]{index=2}.  It is easy to set up thanks to its user‑friendly interface:contentReference[oaicite:3]{index=3}. |
+| **Cisco ASA 5506‑X firewall** | Provides stateful inspection, NAT and VPN termination.  The ASA 5500‑X series combines proven firewall technology with intrusion‑prevention capabilities; it uses a 64‑bit multicore architecture that offers higher firewall and VPN throughput and can run multiple security services simultaneously:contentReference[oaicite:4]{index=4}.  The ASA supports standard security services such as Cisco Security Intelligence Operations, application visibility and control, built‑in IPS and integration with AnyConnect VPN clients:contentReference[oaicite:5]{index=5}. |
+| **Cisco 2504 WLC** | Centralised wireless controller that manages the lightweight APs.  This WLC supports up to 75 access points and 1 000 clients:contentReference[oaicite:6]{index=6}.  It offers advanced security mechanisms and comprehensive management capabilities while remaining suitable for small‑to‑medium networks:contentReference[oaicite:7]{index=7}:contentReference[oaicite:8]{index=8}.  Initial configuration involves connecting the controller to the network, accessing the web interface with the `admin` / `Cisco123` credentials and registering the APs:contentReference[oaicite:9]{index=9}. |
+| **Lightweight APs (2 × LAP‑PT)** | Provide wireless coverage for mobile clients.  They obtain configuration and firmware from the WLC over the management VLAN. |
+| **IP phones (7960)** | Voice endpoints that connect through the access switches.  The voice VLAN feature uses Cisco Discovery Protocol version 2 (CDPv2) to tell the phone which VLAN ID to tag voice packets:contentReference[oaicite:10]{index=10}.  The switch must be configured with a voice VLAN before it can advertise it; a simple configuration uses the `vlan <id>` commands and marks the VLAN as `voice`:contentReference[oaicite:11]{index=11}. |
+| **End hosts** | PCs and smartphones on the data VLAN test IPv4/IPv6 connectivity.  A server on VLAN 13 provides an internal service (e.g. web or file server), and a server in the Internet cloud demonstrates public reachability. |
+
+## Design highlights
+
+### Network segmentation
+
+* **Voice and data separation:**  Each access port is configured with a data VLAN (untagged) and a voice VLAN (tagged) so that IP phones and PCs can coexist on the same physical port.  CDPv2 advertises the configured voice VLAN to legacy phones so that they correctly tag their traffic:contentReference[oaicite:12]{index=12}.  Before CDPv2 can advertise the VLAN ID, the VLAN must be created and flagged as a voice VLAN on the switch:contentReference[oaicite:13]{index=13}.
+* **Wireless and management isolation:**  A dedicated VLAN carries CAPWAP traffic between the WLC and the lightweight APs.  An additional management IP (192.168.1.2/24) is used for out‑of‑band access to the WLC.
+* **Server and infrastructure networks:**  The internal server resides on VLAN 13 to isolate server traffic from user traffic.  /30 point‑to‑point links (`10.0.255.0/30` and `10.0.255.4/30`) connect the distribution switch to the internal router and firewall respectively.
+
+### Inter‑VLAN routing and EtherChannel
+
+The Catalyst 3560 is configured with Switched Virtual Interfaces (SVIs) for VLANs 10–13.  Each SVI has an IPv4 gateway address and an IPv6 gateway for VLAN 10.  A default route points towards the ASA for Internet‑bound traffic.  The two 2960 access switches form an EtherChannel (LACP) to the 3560, providing increased bandwidth and resiliency.
+
+### Firewall and NAT
+
+All outbound traffic passes through the ASA 5506‑X.  The firewall implements stateful inspection and translates internal addresses to a single public address using **Dynamic Port Address Translation (PAT)**.  In Dynamic PAT the firewall modifies both IP addresses and port numbers so that multiple internal hosts can share one public IP address:contentReference[oaicite:14]{index=14}.  The ASA can also perform **Dynamic NAT**, which modifies only IP addresses and gives each internal host a temporary public address:contentReference[oaicite:15]{index=15}, but Dynamic PAT is more common in small networks.  NAT is configured using network objects and `nat` statements inside the ASA configuration.
+
+### Routing
+
+Router 0 and the 3560 have static routes pointing towards the ASA for default routing.  Router 1 has a static route to the inside (50.1.2.0/30) and a default route towards the “Internet server”.  The 3560 may also run a dynamic routing protocol such as EIGRP or OSPF for practice; however, static routing is sufficient for this lab.
+
+### Wireless LAN deployment
+
+The WLC 2504 centralises management of the lightweight APs.  According to the product features, the controller can support up to **75 access points and 1 000 clients**:contentReference[oaicite:16]{index=16} and offers advanced security and management features:contentReference[oaicite:17]{index=17}.  It is ideal for small to medium environments:contentReference[oaicite:18]{index=18}.  To bring the WLC online you connect it to the switch, browse to its management IP, log in with the `admin` / `Cisco123` credentials and follow the wizard to register the APs:contentReference[oaicite:19]{index=19}.
+
+### Platform capabilities
+
+* **Multilayer switching:**  The Catalyst 3560 provides 802.3af PoE and pre‑standard PoE to power phones and access points.  It delivers enterprise‑class intelligent services such as QoS, rate limiting, ACLs and multicast management, and offers high‑performance IP routing:contentReference[oaicite:20]{index=20}.  It features 24 Fast Ethernet ports with SFP uplinks and includes a Standard Multilayer Image that supports basic RIP and static routing; dynamic routing can be enabled with a software upgrade:contentReference[oaicite:21]{index=21}.
+* **Next‑generation firewall:**  The ASA 5506‑X uses a 64‑bit multicore CPU to achieve higher firewall and VPN throughput and can run multiple security services at once:contentReference[oaicite:22]{index=22}.  It integrates threat defence features such as application visibility and control, built‑in IPS, botnet traffic filtering, and integration with Cisco AnyConnect clients:contentReference[oaicite:23]{index=23}.
+* **Integrated services routers:**  The Cisco ISR 4321 provides high‑speed connectivity and security features for small and large enterprises:contentReference[oaicite:24]{index=24}.  It can handle heavy traffic without performance loss and protects the network with built‑in intrusion prevention, firewall and VPN capabilities:contentReference[oaicite:25]{index=25}.  The router is also easy to configure thanks to its intuitive interface:contentReference[oaicite:26]{index=26}.
+
+## Configuration summary
+
+The following snippets illustrate how the lab might be configured.  These commands
+are examples; the actual Packet Tracer file already contains working
+configurations.
+
+### Core switch (Core0) configuration
+
+The distribution switch in this lab is a Catalyst 3560 (24‑port PoE model) running IOS XE 16.3.2.  It acts as the default gateway for all internal VLANs, provides DHCP for the wireless management segment and routes traffic towards the firewall and router.  Highlights of the running configuration are summarised below:
+
+* **Global services:**  IP and IPv6 routing are enabled (`ip routing`, `ipv6 unicast‑routing`), LLDP is running for device discovery (`lldp run`) and the spanning‑tree mode is set to Rapid PVST+ with a root priority of 4096 for all VLANs.  IP flow export is enabled to allow NetFlow exports.
+* **DHCP:**  A small DHCP pool called `wireless` hands out management addresses in the `192.168.1.0/28` range for the WLC and LAPs.  The address `192.168.1.2` is excluded because it is statically assigned to the WLC.  Other VLANs use DHCP relays (`ip helper‑address`) pointing at an external server, but these are configured within the Packet Tracer file rather than shown here.
+* **Layer‑3 links:**  The switch uses routed ports to connect to the internal router and firewall.  GigabitEthernet1/0/3 is configured as a routed interface with the address `10.0.255.1/30` towards Router 0, and GigabitEthernet1/0/5 uses `10.0.255.5/30` towards the ASA.  All other uplinks are configured as trunks or are unused in this lab.
+* **SVIs:**  Switched Virtual Interfaces provide gateway addresses for each VLAN.  VLAN 1 (`192.168.1.1/28`) is used for management, VLAN 10 uses `10.0.10.1/24` and IPv6 `2001:10::1/64`, VLAN 11 uses `10.0.11.1/24`, VLAN 12 uses `10.0.12.1/24` and VLAN 13 uses `10.0.13.1/24`.  Each SVI has a unique MAC address specified to simulate different gateways in Packet Tracer.
+* **Static route:**  A static route points specific traffic (`1.1.1.1/32`) towards the internal router at `10.0.255.2`.  In a real deployment this would typically be a default route pointing towards the firewall; however, this lab uses a /32 route to demonstrate static routing.
+
+Below is an excerpt of the `show running‑config` output from Core0 with irrelevant sections removed for brevity:
+
+```text
+version 16.3.2
+hostname Core0
+!
+ip dhcp excluded‑address 192.168.1.2
+ip dhcp pool wireless
+ network 192.168.1.0 255.255.255.240
+ default‑router 192.168.1.1
+!
+ip routing
+ipv6 unicast‑routing
+lldp run
+spanning‑tree mode rapid‑pvst
+spanning‑tree vlan 1‑4094 priority 4096
+!
+interface GigabitEthernet1/0/1
+ switchport mode trunk
+!
+interface GigabitEthernet1/0/2
+ switchport mode trunk
+!
+interface GigabitEthernet1/0/3
+ no switchport
+ ip address 10.0.255.1 255.255.255.252
+!
+interface GigabitEthernet1/0/5
+ no switchport
+ ip address 10.0.255.5 255.255.255.252
+!
+interface Vlan1
+ ip address 192.168.1.1 255.255.255.240
+!
+interface Vlan10
+ mac‑address 00d0.5807.ad01
+ ip address 10.0.10.1 255.255.255.0
+ ipv6 address 2001:10::1/64
+!
+interface Vlan11
+ mac‑address 00d0.5807.ad02
+ ip address 10.0.11.1 255.255.255.0
+!
+interface Vlan12
+ mac‑address 00d0.5807.ad03
+ ip address 10.0.12.1 255.255.255.0
+!
+interface Vlan13
+ mac‑address 00d0.5807.ad04
+ ip address 10.0.13.1 255.255.255.0
+!
+ip route 1.1.1.1 255.255.255.255 10.0.255.2
+
