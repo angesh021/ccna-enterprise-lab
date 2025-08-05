@@ -171,11 +171,11 @@ interface Vlan13
 !
 ip route 1.1.1.1 255.255.255.255 10.0.255.2
 
-
+```
 
 
 ### Catalyst 2960 access switch
-
+```text
 ! Trunk towards distribution switch
 interface GigabitEthernet0/1
  description To 3560 (Port‑channel)
@@ -195,4 +195,41 @@ interface FastEthernet0/11
  switchport access vlan 12
  power inline auto
  spanning‑tree portfast
+```
+
+
+### Cisco ASA 5506‑X
+```text
+! Define inside and outside interfaces
+interface GigabitEthernet1/1
+ nameif inside
+ security‑level 100
+ ip address 10.0.255.6 255.255.255.252
+!
+interface GigabitEthernet1/2
+ nameif outside
+ security‑level 0
+ ip address 50.1.2.1 255.255.255.252
+
+! Define DMZ interface if desired (not used here)
+
+! Configure dynamic PAT (inside to outside)
+object network INSIDE_NET
+ subnet 10.0.0.0 255.255.0.0
+ nat (inside,outside) dynamic interface  ! Many hosts share the outside interface:contentReference[oaicite:28]{index=28}
+
+! Optionally define a static NAT for the internal server
+object network INTERNAL_SERVER
+ host 10.0.13.5
+ nat (inside,outside) static 50.1.2.5
+
+! Basic access control
+access‑list OUTBOUND extended permit ip any any
+access‑group OUTBOUND in interface inside
+
+! Default route
+route outside 0.0.0.0 0.0.0.0 50.1.2.2
+
+
+```
 
