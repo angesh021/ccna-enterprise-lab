@@ -140,11 +140,6 @@ The distribution switch in this lab is a Catalyst 3560 (24‑port PoE model) r
 
 
 ```text
-version 16.3.2
-no service timestamps log datetime msec
-no service timestamps debug datetime msec
-no service password-encryption
-
 hostname Core0
 
 ip dhcp excluded-address 192.168.1.2
@@ -208,28 +203,119 @@ line vty 0 4
 ```
 
 
-### switch0 (2960-24TT access switch)
-```text
-! Trunk towards distribution switch
-interface GigabitEthernet0/1
- description To 3560 (Port‑channel)
- switchport mode trunk
- channel‑group 1 mode active
+### switch0 (2960-24TT Access Switch)
+<img width="1475" height="586" alt="image" src="https://github.com/user-attachments/assets/ea702ab4-2a52-4c68-9b15-0047802dae41" />
 
-! Access port for PC and phone
-interface FastEthernet0/10
- switchport mode access
+* **Purpose:** Switch0 is a Catalyst 2960 acting purely at Layer 2. It provides edge connectivity for PCs, phones and access points and aggregates uplinks to the distribution switch.
+* **Spanning Tree:** Rapid PVST+ is used with an extended system ID. A priority of **8192** makes Switch0 the secondary root bridge (the 3560 has priority 4096). This improves convergence if the primary fails.
+* **Port‑channel uplink:** Interfaces `FastEthernet0/3` and `0/4` are configured as trunks and grouped into `Port-channel1` using LACP (`channel-group 1 mode active`). This bundles two links to the core for higher throughput and redundancy.
+* **Edge ports:** `FastEthernet0/1` is an access port for data VLAN 10 with a voice VLAN 11 tagged for the IP phone. Portfast and BPDU Guard are enabled to allow immediate forwarding and to protect against accidental loop introductions. `FastEthernet0/2` is also set as an edge port with BPDU Guard enabled, ready for another host.
+* **Trunk ports:** `GigabitEthernet0/1` and `0/2` are trunk links (unused in this lab but available for future expansion).
+* **No SVIs:** The switch operates purely as a Layer‑2 device; `Vlan1` has no IP address and is shut down. All inter‑VLAN routing is done on the core switch.
+
+
+```text
+hostname Switch0
+
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+spanning-tree vlan 1-4094 priority 8192
+
+interface Port-channel1
+ switchport mode trunk
+
+interface FastEthernet0/1
  switchport access vlan 10
- switchport voice vlan 11    ! Voice VLAN is advertised via CDPv2:contentReference[oaicite:27]{index=27}
- mls qos trust device cisco‑phone
- spanning‑tree portfast
-!
-interface FastEthernet0/11
- description Access point
- switchport access vlan 12
- power inline auto
- spanning‑tree portfast
+ switchport mode access
+ switchport voice vlan 11
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+
+interface FastEthernet0/2
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+
+interface FastEthernet0/3
+ switchport mode trunk
+ channel-group 1 mode active
+
+interface FastEthernet0/4
+ switchport mode trunk
+ channel-group 1 mode active
+
+interface GigabitEthernet0/1
+ switchport mode trunk
+interface GigabitEthernet0/2
+ switchport mode trunk
+
+interface Vlan1
+ no ip address
+ shutdown
+
+line vty 0 4
+ login
+line vty 5 15
+ login
+````
+
+
+
+### switch1 (2960-24TT Access Switch)
+
+* **Purpose:** Switch1 mirrors the configuration of Switch0 and serves as the second access switch. It extends VLANs 10–11 to edge devices and forms the other end of the EtherChannel uplink.
+* **Spanning Tree:** The priority is set to **12288**, making this switch the tertiary root bridge in the spanning‑tree hierarchy. This ensures deterministic root switch selection: Core0 (4096) → Switch0 (8192) → Switch1 (12288).
+* **Uplink and edge ports:** The `FastEthernet0/3–0/4` trunk channel joins `Port-channel1` and connects to Core0. Edge ports `FastEthernet0/1` and `0/2` are configured identically to Switch0, supporting a PC/phone pair and an additional host respectively.
+* **No Layer‑3 functionality:** Like Switch0, Switch1 does not host any SVIs (`Vlan1` is shut down); all routing functions are delegated to the multilayer switch.
+
+  
+```text
+
+hostname Switch1
+
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+spanning-tree vlan 1-4094 priority 12288
+
+interface Port-channel1
+ switchport mode trunk
+
+interface FastEthernet0/1
+ switchport access vlan 10
+ switchport mode access
+ switchport voice vlan 11
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+
+interface FastEthernet0/2
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+
+interface FastEthernet0/3
+ switchport mode trunk
+ channel-group 1 mode active
+
+interface FastEthernet0/4
+ switchport mode trunk
+ channel-group 1 mode active
+
+interface GigabitEthernet0/1
+ switchport mode trunk
+interface GigabitEthernet0/2
+ switchport mode trunk
+
+interface Vlan1
+ no ip address
+ shutdown
+
+line vty 0 4
+ login
+line vty 5 15
+ login
 ```
+
+These two access switches together form a resilient Layer‑2 edge for the environment. They provide VLAN separation, voice/data coexistence on access ports, and a redundant EtherChannel uplink to the distribution layer.
+
+
 
 
 ### ciscoasa (Cisco ASA 5506‑X)
