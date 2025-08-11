@@ -104,11 +104,10 @@ The WLC 2504 centralises management of the lightweight APs.  According to the p
 
 ## Configuration summary
 
-The following snippets illustrate how the lab might be configured.  These commands
-are examples; the actual Packet Tracer file already contains working
+The following snippets illustrate how the lab might be configured. The actual Packet Tracer file already contains working
 configurations.
 
-### Core switch (Core0) configuration
+### Core0 (3650-24PS Multilayer Switch)
 
 The distribution switch in this lab is a Catalyst 3560 (24‑port PoE model) running IOS XE 16.3.2.  It acts as the default gateway for all internal VLANs, provides DHCP for the wireless management segment and routes traffic towards the firewall and router.  Highlights of the running configuration are summarised below:
 
@@ -118,9 +117,6 @@ The distribution switch in this lab is a Catalyst 3560 (24‑port PoE model) r
 * **SVIs:**  Switched Virtual Interfaces provide gateway addresses for each VLAN.  VLAN 1 (`192.168.1.1/28`) is used for management, VLAN 10 uses `10.0.10.1/24` and IPv6 `2001:10::1/64`, VLAN 11 uses `10.0.11.1/24`, VLAN 12 uses `10.0.12.1/24` and VLAN 13 uses `10.0.13.1/24`.  Each SVI has a unique MAC address specified to simulate different gateways in Packet Tracer.
 * **Static route:**  A static route points specific traffic (`1.1.1.1/32`) towards the internal router at `10.0.255.2`.  In a real deployment this would typically be a default route pointing towards the firewall; however, this lab uses a /32 route to demonstrate static routing.
 
-Below is an example of the `show running‑config` output from Core0 with irrelevant sections removed for brevity:
-
-### Core0 (3650-24PS Multilayer Switch)
 ```text
 hostname Core0
 !
@@ -198,51 +194,106 @@ interface FastEthernet0/11
 ```
 
 
-### ASA0 (Cisco ASA 5506‑X)
+### ciscoasa (Cisco ASA 5506‑X)
+This configuration positions the ASA as the firewall between the trusted network (`10.0.255.4/30`) and the external network (`50.1.2.0/30`). It assigns security levels, defines inspection rules, and prepares the device for NAT once objects and NAT statements are added.
+
+
+* **Inside interface (`GigabitEthernet1/1`)** – Named `inside` and set to the highest security level (100). It uses IP `10.0.255.6/30` and connects to the Core0 switch on the `10.0.255.4/30` subnet (Core0 uses `10.0.255.5/30`). All internal VLAN traffic enters the firewall via this link.
+* **Outside interface (`GigabitEthernet1/2`)** – Named `outside` with the lowest security level (0). It uses IP `50.1.2.1/30` and connects to the edge router (`Router1`) on the `50.1.2.0/30` subnet. Router1 uses `50.1.2.2/30`, providing the ASA’s path to the Internet or external network.
+* **Unused interfaces** – Interfaces `GigabitEthernet1/3–1/8` and `Management1/1` are not needed in this lab. They have no `nameif` assigned, no security level, no IP address and are shut down.
+* **Inspection policy** – The `class-map` and `policy-map` entries create a global inspection policy. It matches default inspection traffic and inspects DNS, FTP and TFTP protocols. This allows the ASA to perform stateful inspection on these protocols and enforce protocol‑specific security rules.
+* **Service policy** – `service-policy global_policy global` applies the inspection policy to all interfaces.
+* **Management time‑outs** – Telnet and SSH sessions time out after five minutes, controlling session duration.
+* **NAT/PAT** – NAT rules are not shown here; they would normally translate internal addresses on the `inside` interface to a public IP on the `outside` interface. In the full lab configuration, you would define network objects for your internal subnets (e.g., `10.0.0.0/16`) and add `nat (inside,outside)` commands to implement Dynamic PAT or Static NAT as needed.
+
 ```text
-! Define inside and outside interfaces
+hostname ciscoasa
+
 interface GigabitEthernet1/1
  nameif inside
- security‑level 100
+ security-level 100
  ip address 10.0.255.6 255.255.255.252
-!
+
 interface GigabitEthernet1/2
  nameif outside
- security‑level 0
+ security-level 0
  ip address 50.1.2.1 255.255.255.252
 
-! Define DMZ interface if desired (not used here)
+interface GigabitEthernet1/3
+ no nameif
+ no security-level
+ no ip address
+ shutdown
 
-! Configure dynamic PAT (inside to outside)
-object network INSIDE_NET
- subnet 10.0.0.0 255.255.0.0
- nat (inside,outside) dynamic interface  ! Many hosts share the outside interface:contentReference[oaicite:28]{index=28}
+interface GigabitEthernet1/4
+ no nameif
+ no security-level
+ no ip address
+ shutdown
 
-! Optionally define a static NAT for the internal server
-object network INTERNAL_SERVER
- host 10.0.13.5
- nat (inside,outside) static 50.1.2.5
+interface GigabitEthernet1/5
+ no nameif
+ no security-level
+ no ip address
+ shutdown
 
-! Basic access control
-access‑list OUTBOUND extended permit ip any any
-access‑group OUTBOUND in interface inside
+interface GigabitEthernet1/6
+ no nameif
+ no security-level
+ no ip address
+ shutdown
 
-! Default route
-route outside 0.0.0.0 0.0.0.0 50.1.2.2
+interface GigabitEthernet1/7
+ no nameif
+ no security-level
+ no ip address
+ shutdown
+
+interface GigabitEthernet1/8
+ no nameif
+ no security-level
+ no ip address
+ shutdown
+
+interface Management1/1
+ management-only
+ no nameif
+ no security-level
+ no ip address
+ shutdown
+
+class-map inspection_default
+ match default-inspection-traffic
+
+policy-map type inspect dns preset_dns_map
+ parameters
+  message-length maximum 512
+
+policy-map global_policy
+ class inspection_default
+  inspect dns preset_dns_map
+  inspect ftp
+  inspect tftp
+
+service-policy global_policy global
+
+telnet timeout 5
+ssh timeout 5
 ```
 
 ### Router (Cisco Router ISR4321)
 Router essentially acts as the internal router between the core distribution switch and the ASA firewall. It learns routes via static entries and provides a routed path for packets leaving the VLANs on the core switch toward the edge of the network.
 
-* Interface GigabitEthernet0/0/0 (10.0.255.2/30) – This routed link connects Router0 to the Core (Catalyst 3560) switch. The core switch’s corresponding interface is Gig1/0/3 with IP 10.0.255.1/30. Together these form a point-to-point link on the 10.0.255.0/30 subnet. It serves as the router’s gateway to all internal VLANs.
+* **Interface GigabitEthernet0/0/0 (10.0.255.2/30)** – This routed link connects Router0 to the Core (Catalyst 3560) switch. The core switch’s corresponding interface is Gig1/0/3 with IP `10.0.255.1/30`. Together these form a point-to-point link on the `10.0.255.0/30` subnet. It serves as the router’s gateway to all internal VLANs.
 
-* Loopback1 (1.1.1.1/32) – A loopback interface is often used to represent the router in routing protocols and for testing reachability. In this lab, it also acts as the destination for the static route configured on the core switch (ip route 1.1.1.1 255.255.255.255 10.0.255.2).
+* **Loopback1 (1.1.1.1/32)** – A loopback interface is often used to represent the router in routing protocols and for testing reachability. In this lab, it also acts as the destination for the static route configured on the core switch (`ip route 1.1.1.1 255.255.255.255 10.0.255.2`).
 
-* Static route – ip route 10.0.10.0 255.255.255.0 10.0.255.1 points traffic destined for the data VLAN (10.0.10.0/24) to the Core switch’s IP (10.0.255.1). The core switch then forwards packets to the appropriate VLAN interface. You could add similar routes for other VLANs if needed (e.g., 10.0.11.0/24, 10.0.12.0/24, 10.0.13.0/24).
+* **Static route** – `ip route 10.0.10.0 255.255.255.0 10.0.255.1` points traffic destined for the data VLAN (10.0.10.0/24) to the Core switch’s IP (`10.0.255.1`). The core switch then forwards packets to the appropriate VLAN interface. You could add similar routes for other VLANs if needed (e.g., 10.0.11.0/24, 10.0.12.0/24, 10.0.13.0/24).
 
-* CEF – Cisco Express Forwarding is enabled for IPv4, improving packet-switching performance. IPv6 CEF is disabled here because this router isn’t handling IPv6 traffic.
+* **CEF** – Cisco Express Forwarding is enabled for IPv4, improving packet-switching performance. IPv6 CEF is disabled here because this router isn’t handling IPv6 traffic.
 
-* NetFlow export – ip flow-export version 9 prepares the router to export NetFlow records (though it doesn’t specify a destination). This could be used for traffic analysis.
+* **NetFlow export** – `ip flow-export version 9` prepares the router to export NetFlow records (though it doesn’t specify a destination). This could be used for traffic analysis.
+
 
 ```text
 hostname Router
@@ -285,3 +336,23 @@ line aux 0
 line vty 0 4
  login
 ```
+
+### Wireless LAN Controller (WLC-2504)
+
+The WLC provides centralised management for all lightweight access points in the lab. Key details of the controller’s are summarised below:
+
+- **Management IP address:** `192.168.1.2` (on the management VLAN). This is the address used to reach the WLC via HTTPS, with `192.168.1.1` on Core0 acting as the default gateway.
+- **Radio states:** Both the **802.11a/n/ac** (5 GHz) and **802.11b/g/n** (2.4 GHz) networks are **enabled**, so the APs broadcast on both bands.
+- **Access point summary:** Two lightweight APs are registered; each has its 5 GHz and 2.4 GHz radios **up** (0 down). This matches the two LAPs connected in the lab topology.
+- **Client summary:** The WLC reports **2 current clients**, which aligns with the smartphones connected to the wireless VLAN.
+- **Rogue detection:** The **Rogue Summary** shows zero rogue APs, clients, or ad‑hoc rogues, indicating no unauthorized wireless activity has been detected.
+- **System utilisation:** CPU utilisation is negligible (0 % across cores), memory usage is around **46 %**, and fan speed is **3800 rpm**, which are typical for a lightly loaded controller.
+
+#### Dashboard screenshot
+
+To provide a visual reference, embed the dashboard screenshot below:
+<img width="2781" height="1301" alt="image" src="https://github.com/user-attachments/assets/99543a0c-864a-4a53-9743-8cdf7f4359aa" />
+<img width="2827" height="672" alt="image" src="https://github.com/user-attachments/assets/6acf520c-3152-43d6-9e66-05716007a749" />
+
+ :agentCitation{citationIndex='0' label='WLC dashboard'}
+
