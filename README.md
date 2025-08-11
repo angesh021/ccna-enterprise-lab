@@ -350,9 +350,7 @@ The WLC provides centralised management for all lightweight access points in the
 
 #### Dashboard screenshot
 
-To provide a visual reference, embed the dashboard screenshot below:
+To provide a visual reference of the dashboard screenshot below:
 <img width="2781" height="1301" alt="image" src="https://github.com/user-attachments/assets/99543a0c-864a-4a53-9743-8cdf7f4359aa" />
 <img width="2827" height="672" alt="image" src="https://github.com/user-attachments/assets/6acf520c-3152-43d6-9e66-05716007a749" />
-
- :agentCitation{citationIndex='0' label='WLC dashboard'}
 
