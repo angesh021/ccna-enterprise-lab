@@ -7,6 +7,7 @@ addressing, provides inter‑VLAN routing and applies security policies with a
 Next Generation Firewall.  The lab topology, shown below, mixes layer‑2 and
 layer‑3 switching, enterprise Wi‑Fi and firewalling to simulate the kind of
 networks encountered in real world deployments.
+<img width="2191" height="1444" alt="image" src="https://github.com/user-attachments/assets/e640084c-d0ad-4a5e-896d-51b39313cf14" />
 
 
 
@@ -112,60 +113,97 @@ configurations.
 The distribution switch in this lab is a Catalyst 3560 (24‑port PoE model) running IOS XE 16.3.2.  It acts as the default gateway for all internal VLANs, provides DHCP for the wireless management segment and routes traffic towards the firewall and router.  Highlights of the running configuration are summarised below:
 
 * **Global services:**  IP and IPv6 routing are enabled (`ip routing`, `ipv6 unicast‑routing`), LLDP is running for device discovery (`lldp run`) and the spanning‑tree mode is set to Rapid PVST+ with a root priority of 4096 for all VLANs.  IP flow export is enabled to allow NetFlow exports.
-* **DHCP:**  A small DHCP pool called `wireless` hands out management addresses in the `192.168.1.0/28` range for the WLC and LAPs.  The address `192.168.1.2` is excluded because it is statically assigned to the WLC.  Other VLANs use DHCP relays (`ip helper‑address`) pointing at an external server, but these are configured within the Packet Tracer file rather than shown here.
-* **Layer‑3 links:**  The switch uses routed ports to connect to the internal router and firewall.  GigabitEthernet1/0/3 is configured as a routed interface with the address `10.0.255.1/30` towards Router 0, and GigabitEthernet1/0/5 uses `10.0.255.5/30` towards the ASA.  All other uplinks are configured as trunks or are unused in this lab.
-* **SVIs:**  Switched Virtual Interfaces provide gateway addresses for each VLAN.  VLAN 1 (`192.168.1.1/28`) is used for management, VLAN 10 uses `10.0.10.1/24` and IPv6 `2001:10::1/64`, VLAN 11 uses `10.0.11.1/24`, VLAN 12 uses `10.0.12.1/24` and VLAN 13 uses `10.0.13.1/24`.  Each SVI has a unique MAC address specified to simulate different gateways in Packet Tracer.
-* **Static route:**  A static route points specific traffic (`1.1.1.1/32`) towards the internal router at `10.0.255.2`.  In a real deployment this would typically be a default route pointing towards the firewall; however, this lab uses a /32 route to demonstrate static routing.
+
+* **DHCP configuration:** A DHCP exclusion reserves the WLC’s management IP (`192.168.1.2`). The `wireless` DHCP pool hands out addresses from `192.168.1.0/28` with `192.168.1.1` as the default router. This pool serves the WLC management network; other VLANs use DHCP relays (configured in the Packet Tracer file).
+
+* **Uplink and routed interfaces(Layer‑3 links):**
+
+  * `GigabitEthernet1/0/1` and `1/0/2` are trunk ports forming an EtherChannel to the access switches (Catalyst 2960s).
+  * `GigabitEthernet1/0/3` is a routed interface with IP `10.0.255.1/30`, connecting to Router 0 on the `10.0.255.0/30` subnet (`Router0` uses `10.0.255.2/30`).
+  * `GigabitEthernet1/0/5` is another routed link using `10.0.255.5/30`, connecting to the ASA firewall (`ASA` uses `10.0.255.6/30`) on the `10.0.255.4/30` subnet.
+  * Many other ports remain unused in this lab and therefore have no configuration.
+
+* **Access port:** `GigabitEthernet1/1/1` is an access port assigned to VLAN 13 for the internal server (`10.0.13.5`). It carries untagged server traffic directly to the server segment.
+
+* **SVI gateways:**
+
+  * `Vlan1` (`192.168.1.1/28`) is the management SVI used as the default gateway for the WLC and AP management addresses.
+  * `Vlan10` (`10.0.10.1/24` and `2001:10::1/64`) is the data VLAN gateway, supporting both IPv4 and IPv6.
+  * `Vlan11` (`10.0.11.1/24`) provides the voice gateway for IP phones.
+  * `Vlan12` (`10.0.12.1/24`) is used for CAPWAP traffic between the lightweight APs and the WLC.
+  * `Vlan13` (`10.0.13.1/24`) is the server VLAN gateway.
+
+* **Static route:** `ip route 1.1.1.1 255.255.255.255 10.0.255.2` sends traffic destined for the loopback address of Router0 (1.1.1.1/32) to Router0’s IP (`10.0.255.2`). In a real deployment, this would usually be a default route pointing to the firewall or edge router, but the /32 route here demonstrates static routing.
+
+* **Flow export and management:** `ip flow-export version 9` enables NetFlow v9 export, useful for traffic analysis. Line vty is configured for remote login.
+
+
 
 ```text
+version 16.3.2
+no service timestamps log datetime msec
+no service timestamps debug datetime msec
+no service password-encryption
+
 hostname Core0
-!
-ip dhcp excluded‑address 192.168.1.2
+
+ip dhcp excluded-address 192.168.1.2
 ip dhcp pool wireless
  network 192.168.1.0 255.255.255.240
- default‑router 192.168.1.1
-!
+ default-router 192.168.1.1
+
+no ip cef
 ip routing
-ipv6 unicast‑routing
+ipv6 unicast-routing
+no ipv6 cef
+
 lldp run
-spanning‑tree mode rapid‑pvst
-spanning‑tree vlan 1‑4094 priority 4096
-!
+
+spanning-tree mode rapid-pvst
+spanning-tree vlan 1-4094 priority 4096
+
 interface GigabitEthernet1/0/1
  switchport mode trunk
-!
 interface GigabitEthernet1/0/2
  switchport mode trunk
-!
 interface GigabitEthernet1/0/3
  no switchport
  ip address 10.0.255.1 255.255.255.252
-!
+ duplex auto
+ speed auto
 interface GigabitEthernet1/0/5
  no switchport
  ip address 10.0.255.5 255.255.255.252
-!
+ duplex auto
+ speed auto
+
+interface GigabitEthernet1/1/1
+ switchport access vlan 13
+ switchport mode access
+
 interface Vlan1
  ip address 192.168.1.1 255.255.255.240
-!
 interface Vlan10
- mac‑address 00d0.5807.ad01
+ mac-address 00d0.5807.ad01
  ip address 10.0.10.1 255.255.255.0
  ipv6 address 2001:10::1/64
-!
 interface Vlan11
- mac‑address 00d0.5807.ad02
+ mac-address 00d0.5807.ad02
  ip address 10.0.11.1 255.255.255.0
-!
 interface Vlan12
- mac‑address 00d0.5807.ad03
+ mac-address 00d0.5807.ad03
  ip address 10.0.12.1 255.255.255.0
-!
 interface Vlan13
- mac‑address 00d0.5807.ad04
+ mac-address 00d0.5807.ad04
  ip address 10.0.13.1 255.255.255.0
-!
+
+ip classless
 ip route 1.1.1.1 255.255.255.255 10.0.255.2
+
+ip flow-export version 9
+
+line vty 0 4
+ login
 
 ```
 
