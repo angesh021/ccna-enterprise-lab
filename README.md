@@ -478,3 +478,54 @@ To provide a visual reference of the dashboard screenshot below:
 <img width="2781" height="1301" alt="image" src="https://github.com/user-attachments/assets/99543a0c-864a-4a53-9743-8cdf7f4359aa" />
 <img width="2827" height="672" alt="image" src="https://github.com/user-attachments/assets/6acf520c-3152-43d6-9e66-05716007a749" />
 
+
+
+### Router1 (Internet-facing router)
+
+* **Role:** This router acts as the network’s edge device, connecting the ASA firewall to the wider Internet. It has two routed interfaces but performs no switching or inter‑VLAN routing itself.
+* **Interface Gi0/0/0 (“firewall”):** Assigned `50.1.2.2/30`, it forms a point‑to‑point link with the ASA’s outside interface (`50.1.2.1/30`). This subnet (`50.1.2.0/30`) is the boundary between the internal network and the Internet.
+* **Interface Gi0/0/1 (“internet-server”):** Uses `8.0.0.1/30` and connects to an ISP server or next-hop router at `8.0.0.2/30`. This represents the public side of the network. Traffic from inside the lab that is NATed on the ASA will exit via this interface.
+* **No Layer‑3 VLANs:** `Vlan1` is shut down and has no IP address because this router is not providing gateway services for any local VLANs—it simply forwards packets between its two routed ports.
+* **CEF and NetFlow:** IPv4 CEF is enabled for efficient forwarding, while IPv6 CEF is disabled (the lab doesn’t route IPv6 on this router). NetFlow export is set to version 9 to support flow monitoring if needed.
+* **Routing:** Classless routing is enabled. In the full lab, static routes are configured (in the Packet Tracer file) to direct return traffic for internal subnets (`10.0.0.0/16` and `192.168.1.0/28`) back through the ASA at `50.1.2.1`. These routes aren’t shown in the snippet above but are necessary for reachability.
+  
+```text
+hostname internet-router
+
+ip cef                         ! Enable Cisco Express Forwarding for IPv4
+no ipv6 cef                    ! Disable IPv6 CEF
+
+spanning-tree mode pvst        ! Default PVST spanning tree mode (not used as L2 switch here)
+
+interface GigabitEthernet0/0/0
+ description firewall
+ ip address 50.1.2.2 255.255.255.252
+ duplex auto
+ speed auto
+
+interface GigabitEthernet0/0/1
+ description internet-server
+ ip address 8.0.0.1 255.255.255.252
+ duplex auto
+ speed auto
+
+interface Vlan1
+ no ip address
+ shutdown
+
+ip classless
+ip flow-export version 9        ! NetFlow export version
+
+line vty 0 4
+ login
+line vty 5 15
+ login
+````
+
+
+
+#### Topology reference
+
+The diagram below shows how the ASA, Router1 and the Internet server are connected. The ASA’s outside interface (`50.1.2.1/30`) connects to Router1 at `50.1.2.2/30`, and Router1’s second interface (`8.0.0.1/30`) connects to an ISP server at `8.0.0.2/30`:
+<img width="2322" height="980" alt="image" src="https://github.com/user-attachments/assets/160eb897-1d9f-4f74-a5f1-239f36c89524" />
+
