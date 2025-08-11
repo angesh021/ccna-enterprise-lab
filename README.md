@@ -118,10 +118,10 @@ The distribution switch in this lab is a Catalyst 3560 (24‑port PoE model) r
 * **SVIs:**  Switched Virtual Interfaces provide gateway addresses for each VLAN.  VLAN 1 (`192.168.1.1/28`) is used for management, VLAN 10 uses `10.0.10.1/24` and IPv6 `2001:10::1/64`, VLAN 11 uses `10.0.11.1/24`, VLAN 12 uses `10.0.12.1/24` and VLAN 13 uses `10.0.13.1/24`.  Each SVI has a unique MAC address specified to simulate different gateways in Packet Tracer.
 * **Static route:**  A static route points specific traffic (`1.1.1.1/32`) towards the internal router at `10.0.255.2`.  In a real deployment this would typically be a default route pointing towards the firewall; however, this lab uses a /32 route to demonstrate static routing.
 
-Below is an excerpt of the `show running‑config` output from Core0 with irrelevant sections removed for brevity:
+Below is an example of the `show running‑config` output from Core0 with irrelevant sections removed for brevity:
 
+### Core0 (3650-24PS Multilayer Switch)
 ```text
-version 16.3.2
 hostname Core0
 !
 ip dhcp excluded‑address 192.168.1.2
@@ -174,7 +174,7 @@ ip route 1.1.1.1 255.255.255.255 10.0.255.2
 ```
 
 
-### Catalyst 2960 access switch
+### switch0 (2960-24TT access switch)
 ```text
 ! Trunk towards distribution switch
 interface GigabitEthernet0/1
@@ -198,7 +198,7 @@ interface FastEthernet0/11
 ```
 
 
-### Cisco ASA 5506‑X
+### ASA0 (Cisco ASA 5506‑X)
 ```text
 ! Define inside and outside interfaces
 interface GigabitEthernet1/1
@@ -229,7 +229,59 @@ access‑group OUTBOUND in interface inside
 
 ! Default route
 route outside 0.0.0.0 0.0.0.0 50.1.2.2
-
-
 ```
 
+### Router (Cisco Router ISR4321)
+Router essentially acts as the internal router between the core distribution switch and the ASA firewall. It learns routes via static entries and provides a routed path for packets leaving the VLANs on the core switch toward the edge of the network.
+
+* Interface GigabitEthernet0/0/0 (10.0.255.2/30) – This routed link connects Router0 to the Core (Catalyst 3560) switch. The core switch’s corresponding interface is Gig1/0/3 with IP 10.0.255.1/30. Together these form a point-to-point link on the 10.0.255.0/30 subnet. It serves as the router’s gateway to all internal VLANs.
+
+* Loopback1 (1.1.1.1/32) – A loopback interface is often used to represent the router in routing protocols and for testing reachability. In this lab, it also acts as the destination for the static route configured on the core switch (ip route 1.1.1.1 255.255.255.255 10.0.255.2).
+
+* Static route – ip route 10.0.10.0 255.255.255.0 10.0.255.1 points traffic destined for the data VLAN (10.0.10.0/24) to the Core switch’s IP (10.0.255.1). The core switch then forwards packets to the appropriate VLAN interface. You could add similar routes for other VLANs if needed (e.g., 10.0.11.0/24, 10.0.12.0/24, 10.0.13.0/24).
+
+* CEF – Cisco Express Forwarding is enabled for IPv4, improving packet-switching performance. IPv6 CEF is disabled here because this router isn’t handling IPv6 traffic.
+
+* NetFlow export – ip flow-export version 9 prepares the router to export NetFlow records (though it doesn’t specify a destination). This could be used for traffic analysis.
+
+```text
+hostname Router
+
+ip cef                         ! Enables Cisco Express Forwarding (CEF) for IPv4
+no ipv6 cef                    ! Disables CEF for IPv6 (IPv6 isn’t used on this router)
+
+spanning-tree mode pvst        ! Enables Per‑VLAN Spanning Tree (PVST+) if the router acts as a bridge
+
+! Loopback interface used for testing and as an identifier in routing protocols
+interface Loopback1
+ ip address 1.1.1.1 255.255.255.255
+
+! Connection to the core switch
+interface GigabitEthernet0/0/0
+ ip address 10.0.255.2 255.255.255.252
+ duplex auto
+ speed auto
+
+! Unused interface (shut by default)
+interface GigabitEthernet0/0/1
+ no ip address
+ duplex auto
+ speed auto
+
+! Default VLAN interface (not used, shut down)
+interface Vlan1
+ no ip address
+ shutdown
+
+ip classless                   ! Allows classless routing (routes to non-classful networks)
+
+! Static route to reach the data VLAN (10.0.10.0/24) via the Core switch
+ip route 10.0.10.0 255.255.255.0 10.0.255.1
+
+ip flow-export version 9       ! Sets the NetFlow export version
+
+line con 0
+line aux 0
+line vty 0 4
+ login
+```
